@@ -1,0 +1,17 @@
+{
+  "first_name": "Emma",
+  "last_name": "Carter",
+  "age": 38,
+  "occupation": "Energy Regulation Consultant",
+  "expertise": [
+    "energy policy",
+    "renewable energy regulations",
+    "compliance standards"
+  ],
+  "interests": [
+    "sustainable energy",
+    "environmental law",
+    "industry trends"
+  ],
+  "knowledge": "The Clean Air Act sets emission standards for power plants, updated in 2022. Renewable Portfolio Standards (RPS) require utilities to source a percentage of energy from renewables, varying by state. FERC oversees interstate electricity sales and grid reliability under Order 1000."
+}
