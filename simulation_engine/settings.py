@@ -1,13 +1,13 @@
 from pathlib import Path
 
-OPENAI_API_KEY = "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"
+OPENAI_API_KEY = ""
 KEY_OWNER = "Felipe"
 
-DEBUG = False
+DEBUG = True
 
 MAX_CHUNK_SIZE = 4
 
-LLM_VERS = "gpt-4o-mini"
+LLM_VERS = "gpt-3.5-turbo"
 
 BASE_DIR = f"{Path(__file__).resolve().parent.parent}"
 

@@ -103,49 +103,87 @@ def chat_safe_generate(prompt_input: Union[str, List[str]],
                        max_tokens: int = 1500,
                        file_attachment: str = None,
                        file_type: str = None) -> tuple:
-  """Generate a response using GPT models with error handling & retries."""
-  if file_attachment and file_type:
-    prompt = generate_prompt(prompt_input, prompt_lib_file)
-    messages = [{"role": "user", "content": prompt}]
+    """Generate a response using GPT models with error handling & retries."""
+    import base64
+    import time
+    from simulation_engine.settings import DEBUG  # Ensure DEBUG is imported
 
-    if file_type.lower() == 'image':
-      with open(file_attachment, "rb") as image_file:
-        base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-      messages.append({
-        "role": "user",
-        "content": [
-            {"type": "text", "text": "Please refer to the attached image."},
-            {"type": "image_url", "image_url": 
-              {"url": f"data:image/jpeg;base64,{base64_image}"}}
-        ]
-      })
-      response = gpt4_vision(messages, max_tokens)
+    if file_attachment and file_type:
+        prompt = generate_prompt(prompt_input, prompt_lib_file)
+        messages = [{"role": "user", "content": prompt}]
 
-    elif file_type.lower() == 'pdf':
-      pdf_text = extract_text_from_pdf_file(file_attachment)
-      pdf = f"PDF attachment in text-form:\n{pdf_text}\n\n"
-      instruction = generate_prompt(prompt_input, prompt_lib_file)
-      prompt = f"{pdf}"
-      prompt += f"<End of the PDF attachment>\n=\nTask description:\n{instruction}"
-      response = gpt_request(prompt, gpt_version, max_tokens)
+        if file_type.lower() == 'image':
+            with open(file_attachment, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Please refer to the attached image."},
+                    {"type": "image_url", "image_url": 
+                     {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                ]
+            })
+            response = gpt4_vision(messages, max_tokens)  # Assuming this is defined elsewhere
 
-  else:
-    prompt = generate_prompt(prompt_input, prompt_lib_file)
-    for i in range(repeat):
-      response = gpt_request(prompt, model=gpt_version)
-      if response != "GENERATION ERROR":
-        break
-      time.sleep(2**i)
+        elif file_type.lower() == 'pdf':
+            pdf_text = extract_text_from_pdf_file(file_attachment)  # Assuming this is defined
+            pdf = f"PDF attachment in text-form:\n{pdf_text}\n\n"
+            instruction = generate_prompt(prompt_input, prompt_lib_file)
+            prompt = f"{pdf}"
+            prompt += f"<End of the PDF attachment>\n=\nTask description:\n{instruction}"
+            response = gpt_request(prompt, gpt_version, max_tokens)  # Assuming this is defined
+
     else:
-      response = fail_safe
+        prompt = generate_prompt(prompt_input, prompt_lib_file)
+        messages = [{"role": "user", "content": prompt}]
+        for i in range(repeat):
+            try:
+                # Use chat_completion_with_backoff or direct API call for openai==0.28.0
+                response = chat_completion_with_backoff(messages=messages, model=gpt_version, max_tokens=max_tokens)
+                print("Raw API Response:", response)  # Debug: Log raw response
+                if response and response != "GENERATION ERROR":
+                    break
+            except Exception as e:
+                print(f"API Call Failed (Attempt {i+1}/{repeat}):", str(e))
+                response = "GENERATION ERROR"
+            time.sleep(2**i)
+        else:
+            response = fail_safe
+            print("All retries failed, returning fail_safe:", fail_safe)
 
-  if func_clean_up:
-    response = func_clean_up(response, prompt=prompt)
+    # Ensure response is not None before passing to func_clean_up
+    if func_clean_up:
+        if response is None or response == "GENERATION ERROR":
+            print("Warning: Response is None or errored before cleanup:", response)
+            response = fail_safe
+        else:
+            try:
+                response = func_clean_up(response, prompt=prompt)
+            except Exception as e:
+                print("Cleanup failed:", str(e))
+                response = fail_safe
 
-  if verbose or DEBUG:
-    print_run_prompts(prompt_input, prompt, response)
+    if verbose or DEBUG:
+        print_run_prompts(prompt_input, prompt, response)
 
-  return response, prompt, prompt_input, fail_safe
+    return response, prompt, prompt_input, fail_safe
+
+
+def chat_completion_with_backoff(messages, model, max_tokens=1500):
+    """Helper function for retries with exponential backoff (for openai==0.28.0)."""
+    import openai
+    from simulation_engine.settings import OPENAI_API_KEY
+    openai.api_key = OPENAI_API_KEY
+    try:
+        response = openai.ChatCompletion.create(
+            model=model,
+            messages=messages,
+            max_tokens=max_tokens
+        )
+        return response.choices[0].message["content"]  # Extract content for old API
+    except Exception as e:
+        print("Chat completion error:", str(e))
+        return "GENERATION ERROR"
 
 
 # ============================================================================
