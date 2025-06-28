@@ -413,14 +413,17 @@ class MemoryStream:
       master_nodes = [self.id_to_node[key] for key in list(master_out.keys())]
 
       # **Sort the master_nodes list by last_retrieved in descending order**
-      master_nodes = sorted(master_nodes, 
-                            key=lambda node: node.created, reverse=False)
+      master_nodes = sorted(
+        master_nodes,
+        key=lambda node: node.last_retrieved,
+        reverse=True
+      )
 
       # We do not want to update the last retrieved time_step for these nodes
       # if we are in a stateless mode. 
       if not stateless: 
-        for n in master_nodes: 
-          n.retrieved_time_step = time_step
+        for n in master_nodes:
+          n.last_retrieved = time_step
         
       retrieved[focal_pt] = master_nodes
     
